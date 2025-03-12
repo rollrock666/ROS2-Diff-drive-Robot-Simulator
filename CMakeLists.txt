@@ -59,5 +59,10 @@ install(DIRECTORY
   launch
   DESTINATION share/${PROJECT_NAME}
 )
+
+install(DIRECTORY
+  config
+  DESTINATION share/${PROJECT_NAME}
+)
 # 自动处理安装和导出
 ament_auto_package()

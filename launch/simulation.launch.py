@@ -12,19 +12,24 @@ def generate_launch_description():
     # 定义 RViz 配置文件的路径
     rviz_config_file = os.path.join(pkg_share_dir, 'rviz', 'simulation.rviz')
 
+    # 定义参数文件的路径
+    params_file = os.path.join(pkg_share_dir, 'config', 'params.yaml')
+
     # 定义节点
     simulation_node = Node(
         package='simulation_env',
         executable='simulation_node',
         name='simulation_node',
-        output='screen'
+        output='screen',
+        parameters=[params_file]  # 加载参数文件
     )
 
     simulated_lidar_node = Node(
         package='simulation_env',
         executable='simulated_lidar',
         name='simulated_lidar',
-        output='screen'
+        output='screen',
+        parameters=[params_file]  # 加载参数文件
     )
 
     rviz_node = Node(

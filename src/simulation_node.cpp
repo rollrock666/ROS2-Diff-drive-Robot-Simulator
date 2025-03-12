@@ -17,43 +17,52 @@
 
 using namespace std::chrono_literals;
 
-// 可调参数结构体
-struct RobotSimulatorParams {
-    // 模型参数
-    std::string mesh_resource = "package://simulation_env/meshes/robot.dae";
-    double mesh_scale = 0.0005;
-    double mesh_offset_x = -0.15;  // 模型中心偏移
-    double mesh_offset_y = -0.16;
-
-    // 控制参数
-    double max_linear_vel = 1.0;   // 最大线速度
-    double max_angular_vel = M_PI; // 最大角速度
-    double control_rate = 50.0;   // 控制频率 (Hz)
-
-    // 点云参数
-    std::string pcd_file_path = "/home/tsm/simulation_ws/src/simulation_env/PCD/forest.pcd";
-    double search_radius = 0.5;    // 邻近点搜索半径
-    int min_neighbors = 20;        // 最小邻近点数
-
-    // 高度估计参数
-    double height_offset = 0.0;    // 高度偏移
-};
-
 class RobotSimulator : public rclcpp::Node {
 public:
-    RobotSimulator() : Node("robot_simulator"), tf_broadcaster_(this), params_() {
+    RobotSimulator() : Node("robot_simulator"), tf_broadcaster_(this) {
+        // 从参数服务器加载参数
+        declare_parameter<std::string>("mesh_resource", "package://simulation_env/meshes/robot.dae");
+        declare_parameter<double>("mesh_scale", 0.0005);
+        declare_parameter<double>("mesh_offset_x", -0.15);
+        declare_parameter<double>("mesh_offset_y", -0.16);
+        declare_parameter<double>("max_linear_vel", 1.0);
+        declare_parameter<double>("max_angular_vel", M_PI);
+        declare_parameter<double>("control_rate", 50.0);
+        declare_parameter<std::string>("pcd_file_path", "/home/robot/simulation_ws/src/simulation_env/PCD/forest.pcd");
+        declare_parameter<double>("search_radius", 0.5);
+        declare_parameter<int>("min_neighbors", 20);
+        declare_parameter<double>("height_offset", 0.0);
+        declare_parameter<double>("init_x", 0.0);
+        declare_parameter<double>("init_y", 0.0);
+        declare_parameter<double>("init_z", 0.0);
+        // 获取参数值
+        mesh_resource_ = get_parameter("mesh_resource").as_string();
+        mesh_scale_ = get_parameter("mesh_scale").as_double();
+        mesh_offset_x_ = get_parameter("mesh_offset_x").as_double();
+        mesh_offset_y_ = get_parameter("mesh_offset_y").as_double();
+        max_linear_vel_ = get_parameter("max_linear_vel").as_double();
+        max_angular_vel_ = get_parameter("max_angular_vel").as_double();
+        control_rate_ = get_parameter("control_rate").as_double();
+        pcd_file_path_ = get_parameter("pcd_file_path").as_string();
+        search_radius_ = get_parameter("search_radius").as_double();
+        min_neighbors_ = get_parameter("min_neighbors").as_int();
+        height_offset_ = get_parameter("height_offset").as_double();
+
+        double init_x= get_parameter("init_x").as_double();
+        double init_y= get_parameter("init_y").as_double();
+        double init_z= get_parameter("init_z").as_double();
         // 初始化发布器和订阅器
         model_pub_ = create_publisher<visualization_msgs::msg::Marker>("/robot_model", 10);
         odom_pub_ = create_publisher<nav_msgs::msg::Odometry>("/odom", 10);
         pointcloud_pub_ = create_publisher<sensor_msgs::msg::PointCloud2>("/map_cloud", 1);
         cmd_vel_sub_ = create_subscription<geometry_msgs::msg::Twist>(
             "/cmd_vel", 10, [this](const geometry_msgs::msg::Twist::SharedPtr msg) {
-                linear_vel_ = std::clamp(msg->linear.x, -params_.max_linear_vel, params_.max_linear_vel);
-                angular_vel_ = std::clamp(msg->angular.z, -params_.max_angular_vel, params_.max_angular_vel);
+                linear_vel_ = std::clamp(msg->linear.x, -max_linear_vel_, max_linear_vel_);
+                angular_vel_ = std::clamp(msg->angular.z, -max_angular_vel_, max_angular_vel_);
             });
 
         // 初始化定时器
-        double dt = 1.0 / params_.control_rate;
+        double dt = 1.0 / control_rate_;
         timer_ = create_wall_timer(std::chrono::duration<double>(dt), [this]() {
             updateRobotPose();
             estimateHeightAndPose();
@@ -64,13 +73,23 @@ public:
         });
 
         // 初始化位姿和点云
-        robot_pose_ = {3.0, 3.0, 0.0, 0.0};
+        robot_pose_ = {init_x, init_y, init_z, 0.0};
         loadPointCloud();
     }
 
 private:
-    // 可调参数
-    RobotSimulatorParams params_;
+    // 参数
+    std::string mesh_resource_;
+    double mesh_scale_;
+    double mesh_offset_x_;
+    double mesh_offset_y_;
+    double max_linear_vel_;
+    double max_angular_vel_;
+    double control_rate_;
+    std::string pcd_file_path_;
+    double search_radius_;
+    int min_neighbors_;
+    double height_offset_;
 
     // 点云相关
     pcl::PointCloud<pcl::PointXYZ>::Ptr world_cloud_;
@@ -96,7 +115,7 @@ private:
     // 加载点云
     void loadPointCloud() {
         world_cloud_.reset(new pcl::PointCloud<pcl::PointXYZ>());
-        if (pcl::io::loadPCDFile<pcl::PointXYZ>(params_.pcd_file_path, *world_cloud_) == -1) {
+        if (pcl::io::loadPCDFile<pcl::PointXYZ>(pcd_file_path_, *world_cloud_) == -1) {
             RCLCPP_ERROR(this->get_logger(), "Failed to load PCD file");
             return;
         }
@@ -131,16 +150,16 @@ private:
         std::vector<float> distances;
 
         // 动态调整搜索半径
-        double search_radius = params_.search_radius;
+        double search_radius = search_radius_;
         int num_neighbors = 0;
-        while (num_neighbors < params_.min_neighbors && search_radius <= 2.0 * params_.search_radius) {
+        while (num_neighbors < min_neighbors_ && search_radius <= 2.0 * search_radius_) {
             num_neighbors = kd_tree_.radiusSearch(search_point, search_radius, indices, distances);
-            if (num_neighbors < params_.min_neighbors) {
+            if (num_neighbors < min_neighbors_) {
                 search_radius += 0.1;  // 逐步增大搜索半径
             }
         }
 
-        if (num_neighbors > params_.min_neighbors) {
+        if (num_neighbors > min_neighbors_) {
             // PCA 法线估计
             Eigen::Matrix3f covariance;
             Eigen::Vector4f centroid;
@@ -175,7 +194,7 @@ private:
             RCLCPP_WARN(this->get_logger(), "Not enough points for height estimation even after increasing search radius! Using last valid estimate.");
 
             // 估计高度
-            double dt = 1.0 / params_.control_rate;
+            double dt = 1.0 / control_rate_;
             double height_change = linear_vel_ * dt * sin(current_orientation_.getAngle());  // 假设高度变化与线速度和姿态有关
             current_height_ += height_change;
 
@@ -190,7 +209,7 @@ private:
 
     // 更新机器人位姿
     void updateRobotPose() {
-        double dt = 1.0 / params_.control_rate;
+        double dt = 1.0 / control_rate_;
         if (std::abs(angular_vel_) > 1e-5) {
             double radius = linear_vel_ / angular_vel_;
             robot_pose_.x += radius * (sin(robot_pose_.theta + angular_vel_ * dt) - sin(robot_pose_.theta));
@@ -212,20 +231,20 @@ private:
         marker.type = visualization_msgs::msg::Marker::MESH_RESOURCE;
         marker.action = visualization_msgs::msg::Marker::ADD;
 
-        marker.mesh_resource = params_.mesh_resource;
+        marker.mesh_resource = mesh_resource_;
         marker.mesh_use_embedded_materials = true;
 
-        double dx = params_.mesh_offset_x;
-        double dy = params_.mesh_offset_y;
+        double dx = mesh_offset_x_;
+        double dy = mesh_offset_y_;
         marker.pose.position.x = robot_pose_.x + dx * cos(robot_pose_.theta) - dy * sin(robot_pose_.theta);
         marker.pose.position.y = robot_pose_.y + dx * sin(robot_pose_.theta) + dy * cos(robot_pose_.theta);
-        marker.pose.position.z = current_height_ + params_.height_offset;
+        marker.pose.position.z = current_height_ + height_offset_;
 
         tf2::Quaternion q;
         q.setRPY(M_PI / 2, 0, M_PI / 2);
         marker.pose.orientation = tf2::toMsg(current_orientation_ * q);
 
-        marker.scale.x = marker.scale.y = marker.scale.z = params_.mesh_scale;
+        marker.scale.x = marker.scale.y = marker.scale.z = mesh_scale_;
         model_pub_->publish(marker);
     }
 
@@ -238,7 +257,7 @@ private:
 
         transform.transform.translation.x = robot_pose_.x;
         transform.transform.translation.y = robot_pose_.y;
-        transform.transform.translation.z = current_height_ + params_.height_offset;
+        transform.transform.translation.z = current_height_ + height_offset_;
         transform.transform.rotation = tf2::toMsg(current_orientation_);
 
         tf_broadcaster_.sendTransform(transform);
@@ -253,7 +272,7 @@ private:
 
         odom_msg.pose.pose.position.x = robot_pose_.x;
         odom_msg.pose.pose.position.y = robot_pose_.y;
-        odom_msg.pose.pose.position.z = current_height_ + params_.height_offset;
+        odom_msg.pose.pose.position.z = current_height_ + height_offset_;
         odom_msg.pose.pose.orientation = tf2::toMsg(current_orientation_);
 
         odom_msg.twist.twist.linear.x = linear_vel_;
