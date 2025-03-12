@@ -28,10 +28,10 @@ struct RobotSimulatorParams {
     // 控制参数
     double max_linear_vel = 1.0;   // 最大线速度
     double max_angular_vel = M_PI; // 最大角速度
-    double control_rate = 100.0;   // 控制频率 (Hz)
+    double control_rate = 50.0;   // 控制频率 (Hz)
 
     // 点云参数
-    std::string pcd_file_path = "/home/tsm/simulation_ws/src/simulation_env/PCD/forest.pcd";
+    std::string pcd_file_path = "/home/tsm/simulation_ws/src/simulation_env/PCD/vocano.pcd";
     double search_radius = 0.5;    // 邻近点搜索半径
     int min_neighbors = 10;        // 最小邻近点数
 
@@ -64,7 +64,7 @@ public:
         });
 
         // 初始化位姿和点云
-        robot_pose_ = {3.0, 0.0, 0.0, 0.0};
+        robot_pose_ = {3.0, 3.0, 0.0, 0.0};
         loadPointCloud();
     }
 
@@ -131,7 +131,17 @@ private:
         std::vector<int> indices;
         std::vector<float> distances;
 
-        if (kd_tree_.radiusSearch(search_point, params_.search_radius, indices, distances) > params_.min_neighbors) {
+        // 动态调整搜索半径
+        double search_radius = params_.search_radius;
+        int num_neighbors = 0;
+        while (num_neighbors < params_.min_neighbors && search_radius <= 2.0 * params_.search_radius) {
+            num_neighbors = kd_tree_.radiusSearch(search_point, search_radius, indices, distances);
+            if (num_neighbors < params_.min_neighbors) {
+                search_radius += 0.1;  // 逐步增大搜索半径
+            }
+        }
+
+        if (num_neighbors > params_.min_neighbors) {
             // PCA 法线估计
             Eigen::Matrix3f covariance;
             Eigen::Vector4f centroid;
@@ -161,7 +171,47 @@ private:
             tf2::Quaternion q_offset;
             q_offset.setRPY(0, 0, M_PI / 2);  // 绕 Z 轴旋转 90°
             current_orientation_ = current_orientation_ * q_offset;
+        } else {
+            // 点云数据不足，使用上一次的估计值
+            RCLCPP_WARN(this->get_logger(), "Not enough points for height estimation even after increasing search radius! Using last valid estimate.");
+            // current_height_ = filtered_height_;
+            // current_orientation_ = filtered_quat_;
         }
+
+        // if (kd_tree_.radiusSearch(search_point, params_.search_radius, indices, distances) > params_.min_neighbors) {
+        //     // PCA 法线估计
+        //     Eigen::Matrix3f covariance;
+        //     Eigen::Vector4f centroid;
+        //     pcl::computeMeanAndCovarianceMatrix(*world_cloud_, indices, covariance, centroid);
+
+        //     Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> solver(covariance);
+        //     Eigen::Vector3f normal = solver.eigenvectors().col(0);
+        //     normal.normalize();
+
+        //     if (normal.z() < 0) normal = -normal;
+        //     current_height_ = centroid.z();
+
+        //     // 构建旋转矩阵
+        //     Eigen::Vector3f z_axis = normal;
+        //     Eigen::Vector3f heading_dir(cos(robot_pose_.theta), sin(robot_pose_.theta), 0);
+        //     Eigen::Vector3f x_axis = heading_dir.cross(z_axis).normalized();
+        //     Eigen::Vector3f y_axis = z_axis.cross(x_axis);
+
+        //     Eigen::Matrix3f rot_matrix;
+        //     rot_matrix.col(0) = x_axis;
+        //     rot_matrix.col(1) = y_axis;
+        //     rot_matrix.col(2) = z_axis;
+
+        //     // 转换为四元数
+        //     Eigen::Quaternionf q(rot_matrix);
+        //     current_orientation_.setValue(q.x(), q.y(), q.z(), q.w());
+        //     tf2::Quaternion q_offset;
+        //     q_offset.setRPY(0, 0, M_PI / 2);  // 绕 Z 轴旋转 90°
+        //     current_orientation_ = current_orientation_ * q_offset;
+        // }
+        // else {
+        
+        // }
     }
 
     // 更新机器人位姿
