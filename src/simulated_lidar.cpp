@@ -23,7 +23,8 @@ public:
         global_cloud_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
             "/map_cloud", 10, std::bind(&SimulatedLidar::globalCloudCallback, this, std::placeholders::_1));
         
-        timer_ = this->create_wall_timer(std::chrono::milliseconds(100), std::bind(&SimulatedLidar::timerCallback, this));
+        // Increase timer frequency to 20 Hz for better responsiveness
+        timer_ = this->create_wall_timer(std::chrono::milliseconds(50), std::bind(&SimulatedLidar::timerCallback, this));
         
         this->declare_parameter<double>("horizontal_resolution", 0.05);
         this->declare_parameter<int>("num_laser_lines", 32);
@@ -50,26 +51,32 @@ private:
     pcl::PointCloud<pcl::PointXYZ>::Ptr global_cloud_;
     nav_msgs::msg::Odometry::SharedPtr current_odom_;
     std::vector<std::vector<double>> bin_matrix_;
+    bool global_cloud_loaded_ = false;
     
     void odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg) {
         current_odom_ = msg;
     }
 
     void globalCloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg) {
-        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
-        pcl::fromROSMsg(*msg, *cloud);
-        global_cloud_ = cloud;
+        if (!global_cloud_loaded_) {
+            pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
+            pcl::fromROSMsg(*msg, *cloud);
+            global_cloud_ = cloud;
+            global_cloud_loaded_ = true;
+            RCLCPP_INFO(this->get_logger(), "Global cloud loaded.");
+        }
     }
 
     void timerCallback() {
-        if (!global_cloud_ || !current_odom_) {
+        if (!global_cloud_loaded_ || !current_odom_) {
             RCLCPP_WARN(this->get_logger(), "Waiting for global cloud and odometry data...");
             return;
         }
 
         geometry_msgs::msg::TransformStamped transform;
         try {
-            transform = tf_buffer_.lookupTransform("base_link", "map", tf2::TimePointZero);
+            // Use the current time to get the latest transform
+            transform = tf_buffer_.lookupTransform("base_link", "map", this->now(), tf2::durationFromSec(0.1));
         } catch (tf2::TransformException &ex) {
             RCLCPP_WARN(this->get_logger(), "Transform error: %s", ex.what());
             return;
@@ -79,14 +86,17 @@ private:
         pcl::PointCloud<pcl::PointXYZ>::Ptr transformed_cloud(new pcl::PointCloud<pcl::PointXYZ>);
         pcl::transformPointCloud(*global_cloud_, *transformed_cloud, transform_matrix);
 
+        // Reset bin matrix
         for (auto& row : bin_matrix_) {
             std::fill(row.begin(), row.end(), std::numeric_limits<double>::max());
         }
 
+        // Add noise to simulate real lidar data
         std::random_device rd;
         std::mt19937 gen(rd());
         std::normal_distribution<double> noise(0.0, 0.02);
 
+        // Use KDTree for faster nearest neighbor search
         pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
         kdtree.setInputCloud(transformed_cloud);
 
@@ -108,6 +118,7 @@ private:
             }
         }
 
+        // Generate simulated lidar point cloud
         pcl::PointCloud<pcl::PointXYZ>::Ptr simulated_lidar_cloud(new pcl::PointCloud<pcl::PointXYZ>);
         for (size_t h = 0; h < bin_matrix_.size(); ++h) {
             for (size_t v = 0; v < bin_matrix_[0].size(); ++v) {
@@ -125,6 +136,7 @@ private:
             }
         }
 
+        // Publish the simulated lidar data
         sensor_msgs::msg::PointCloud2 lidar_msg;
         pcl::toROSMsg(*simulated_lidar_cloud, lidar_msg);
         lidar_msg.header.stamp = this->now();

@@ -16,8 +16,8 @@ simulation_node:
 
     # 点云参数
     pcd_file_path: "/home/tsm/simulation_ws/src/simulation_env/PCD/forest.pcd"
-    search_radius: 0.5    # 邻近点搜索半径
-    min_neighbors: 20     # 最小邻近点数
+    search_radius: 0.2    # 邻近点搜索半径
+    min_neighbors: 5     # 最小邻近点数
 
     # 高度估计参数
     height_offset: 0.0    # 高度偏移
