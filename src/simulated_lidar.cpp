@@ -25,8 +25,8 @@ public:
         
         timer_ = this->create_wall_timer(std::chrono::milliseconds(100), std::bind(&SimulatedLidar::timerCallback, this));
         
-        this->declare_parameter<double>("horizontal_resolution", 0.005);
-        this->declare_parameter<int>("num_laser_lines", 16);
+        this->declare_parameter<double>("horizontal_resolution", 0.05);
+        this->declare_parameter<int>("num_laser_lines", 32);
         horizontal_resolution_ = this->get_parameter("horizontal_resolution").as_double();
         num_laser_lines_ = this->get_parameter("num_laser_lines").as_int();
         
