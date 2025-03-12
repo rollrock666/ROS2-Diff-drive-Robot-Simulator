@@ -33,7 +33,7 @@ struct RobotSimulatorParams {
     // 点云参数
     std::string pcd_file_path = "/home/tsm/simulation_ws/src/simulation_env/PCD/vocano.pcd";
     double search_radius = 0.5;    // 邻近点搜索半径
-    int min_neighbors = 10;        // 最小邻近点数
+    int min_neighbors = 20;        // 最小邻近点数
 
     // 高度估计参数
     double height_offset = 0.0;    // 高度偏移
@@ -125,7 +125,6 @@ private:
         pointcloud_pub_->publish(cloud_msg);
     }
 
-    // 估计高度和姿态
     void estimateHeightAndPose() {
         pcl::PointXYZ search_point{robot_pose_.x, robot_pose_.y, 0};
         std::vector<int> indices;
@@ -172,46 +171,21 @@ private:
             q_offset.setRPY(0, 0, M_PI / 2);  // 绕 Z 轴旋转 90°
             current_orientation_ = current_orientation_ * q_offset;
         } else {
-            // 点云数据不足，使用上一次的估计值
+            // 点云数据不足，使用估计值
             RCLCPP_WARN(this->get_logger(), "Not enough points for height estimation even after increasing search radius! Using last valid estimate.");
-            // current_height_ = filtered_height_;
-            // current_orientation_ = filtered_quat_;
+
+            // 估计高度
+            double dt = 1.0 / params_.control_rate;
+            double height_change = linear_vel_ * dt * sin(current_orientation_.getAngle());  // 假设高度变化与线速度和姿态有关
+            current_height_ += height_change;
+
+            // 估计姿态
+            double angle_change = angular_vel_ * dt;
+            tf2::Quaternion delta_q;
+            delta_q.setRPY(0, 0, angle_change);
+            current_orientation_ = current_orientation_ * delta_q;
+            current_orientation_.normalize();
         }
-
-        // if (kd_tree_.radiusSearch(search_point, params_.search_radius, indices, distances) > params_.min_neighbors) {
-        //     // PCA 法线估计
-        //     Eigen::Matrix3f covariance;
-        //     Eigen::Vector4f centroid;
-        //     pcl::computeMeanAndCovarianceMatrix(*world_cloud_, indices, covariance, centroid);
-
-        //     Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> solver(covariance);
-        //     Eigen::Vector3f normal = solver.eigenvectors().col(0);
-        //     normal.normalize();
-
-        //     if (normal.z() < 0) normal = -normal;
-        //     current_height_ = centroid.z();
-
-        //     // 构建旋转矩阵
-        //     Eigen::Vector3f z_axis = normal;
-        //     Eigen::Vector3f heading_dir(cos(robot_pose_.theta), sin(robot_pose_.theta), 0);
-        //     Eigen::Vector3f x_axis = heading_dir.cross(z_axis).normalized();
-        //     Eigen::Vector3f y_axis = z_axis.cross(x_axis);
-
-        //     Eigen::Matrix3f rot_matrix;
-        //     rot_matrix.col(0) = x_axis;
-        //     rot_matrix.col(1) = y_axis;
-        //     rot_matrix.col(2) = z_axis;
-
-        //     // 转换为四元数
-        //     Eigen::Quaternionf q(rot_matrix);
-        //     current_orientation_.setValue(q.x(), q.y(), q.z(), q.w());
-        //     tf2::Quaternion q_offset;
-        //     q_offset.setRPY(0, 0, M_PI / 2);  // 绕 Z 轴旋转 90°
-        //     current_orientation_ = current_orientation_ * q_offset;
-        // }
-        // else {
-        
-        // }
     }
 
     // 更新机器人位姿
