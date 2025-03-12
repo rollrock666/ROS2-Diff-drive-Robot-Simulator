@@ -1,5 +1,5 @@
 # ROS2 Diff-drive Robot Simulator 
-
+![网络图片](doc/pic.png)
 ## Overview
 
 This ROS 2 package simulates a differential-drive robot in a 3D environment using a mesh model and a point cloud map. The robot's pose is updated based on velocity commands (`/cmd_vel`), and its height and orientation are estimated using Principal Component Analysis (PCA) on the surrounding point cloud data. The simulation includes visualization of the robot model, publishing of odometry, and broadcasting of the robot's transform.
@@ -42,6 +42,10 @@ This ROS 2 package simulates a differential-drive robot in a 3D environment usin
    rviz2 -d src/simulation_env/rviz/simulation.rviz
    ```
 
+4. **Launch lidar**:
+   ```bash
+   ros2 run simulation_env simulated_lidar  
+   ```
 ---
 
 ## Parameters
@@ -82,30 +86,6 @@ The following parameters can be adjusted in the `RobotSimulatorParams` struct wi
 
 ---
 
-## TODO
-
-- **Integrate LiDAR Simulation**:
-  - Add a simulated LiDAR sensor to the robot for generating laser scan data.
-  - Publish LiDAR data to a topic (e.g., `/scan`) for use in navigation or mapping.
-  - Ensure the LiDAR simulation aligns with the robot's pose and environment.
-
-- **Improve Point Cloud Processing**:
-  - Optimize PCA-based height and orientation estimation for better performance.
-  - Add noise modeling for more realistic height estimation.
-
-- **Add Collision Detection**:
-  - Implement collision detection between the robot and the environment using the point cloud map.
-  - Prevent the robot from moving through obstacles.
-
-- **Support Multiple Robot Models**:
-  - Allow users to easily switch between different robot models via parameters.
-
-- **Documentation and Examples**:
-  - Add detailed documentation for integrating the simulator with other ROS 2 packages.
-  - Provide example launch files for common use cases.
-
----
-
 ## License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
@@ -125,5 +105,3 @@ Contributions are welcome! Please open an issue or submit a pull request for any
 - **Eigen**: For linear algebra operations.
 
 ---
-
-This README provides a comprehensive guide to using and customizing the ROS 2 differential-drive robot simulator. The **TODO** section outlines future improvements, including the integration of LiDAR simulation, which is currently missing.

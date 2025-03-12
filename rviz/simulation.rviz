@@ -4,8 +4,10 @@ Panels:
     Name: Displays
     Property Tree Widget:
       Expanded:
+        - /Global Options1
         - /TF1/Tree1
         - /PointCloud21/Autocompute Value Bounds1
+        - /PointCloud22
       Splitter Ratio: 0.5058823823928833
     Tree Height: 719
   - Class: rviz_common/Selection
@@ -153,6 +155,40 @@ Visualization Manager:
         Reliability Policy: Reliable
         Value: /odom
       Value: false
+    - Alpha: 1
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 1.692720890045166
+        Min Value: -1.3162299394607544
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz_default_plugins/PointCloud2
+      Color: 145; 65; 172
+      Color Transformer: FlatColor
+      Decay Time: 0
+      Enabled: true
+      Invert Rainbow: false
+      Max Color: 255; 255; 255
+      Max Intensity: 4096
+      Min Color: 0; 0; 0
+      Min Intensity: 0
+      Name: PointCloud2
+      Position Transformer: XYZ
+      Selectable: true
+      Size (Pixels): 10
+      Size (m): 0.10000000149011612
+      Style: Boxes
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /simulated_lidar
+      Use Fixed Frame: true
+      Use rainbow: true
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 255; 255; 255
@@ -199,25 +235,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 12.476736068725586
+      Distance: 13.924116134643555
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0.18925467133522034
-        Y: 0.5991436839103699
-        Z: 0.34129923582077026
+        X: -0.651530385017395
+        Y: 1.708287000656128
+        Z: -1.0720946788787842
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.20479531586170197
+      Pitch: 0.8247947096824646
       Target Frame: base_link
       Value: Orbit (rviz_default_plugins)
-      Yaw: 0.4460439682006836
+      Yaw: 4.924220085144043
     Saved: ~
 Window Geometry:
   Displays:

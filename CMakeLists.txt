@@ -48,5 +48,12 @@ install(DIRECTORY
   DESTINATION share/${PROJECT_NAME}
 )
 
+add_executable(simulated_lidar src/simulated_lidar.cpp)
+ament_target_dependencies(simulated_lidar rclcpp sensor_msgs nav_msgs pcl_conversions tf2_ros tf2_eigen)
+
+install(TARGETS
+  simulated_lidar
+  DESTINATION lib/${PROJECT_NAME})
+
 # 自动处理安装和导出
 ament_auto_package()

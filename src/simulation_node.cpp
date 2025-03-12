@@ -31,7 +31,7 @@ struct RobotSimulatorParams {
     double control_rate = 50.0;   // 控制频率 (Hz)
 
     // 点云参数
-    std::string pcd_file_path = "/home/tsm/simulation_ws/src/simulation_env/PCD/vocano.pcd";
+    std::string pcd_file_path = "/home/tsm/simulation_ws/src/simulation_env/PCD/forest.pcd";
     double search_radius = 0.5;    // 邻近点搜索半径
     int min_neighbors = 20;        // 最小邻近点数
 
